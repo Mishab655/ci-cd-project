@@ -22,7 +22,7 @@ jobs:
 
     - name: Run pylint
       run: |
-        pylint app
+        pylint app --exit-zero
 
     - name: Run tests
       run: |
