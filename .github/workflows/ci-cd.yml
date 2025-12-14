@@ -27,3 +27,26 @@ jobs:
     - name: Run tests
       run: |
         pytest
+
+  deploy:
+    needs: build-test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - uses: google-github-actions/setup-gcloud@v2
+
+    - name: Build and Deploy
+      run: |
+        gcloud run deploy iris-api \
+          --source . \
+          --region ${{ secrets.GCP_REGION }} \
+          --platform managed \
+          --allow-unauthenticated
+
+
