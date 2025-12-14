@@ -2,71 +2,66 @@ name: CI-CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install pytest pylint
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pylint
 
-    - name: Run pylint
-      run: |
-        pylint app --exit-zero
+      - name: Run pylint
+        run: |
+          pylint app --exit-zero
 
-    - name: Run tests
-      run: |
-        pytest
-  
+      - name: Run tests
+        run: |
+          pytest
+
   deploy:
     needs: build-test
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      # 🔐 Authenticate using Service Account JSON
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      # ⚙️ Setup gcloud and set project
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-        
-    - name: Train the model
-      run: |
-        python train.py
-        
-    - name: Authentication to Google
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{secrets.GCP_SA_KEY}}
-        
-    - name: setup-gcloud
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: ${{secrets.GCP_PROJECT_ID}}
-        
-    - name: build and deploy
-      run: |
-        gcloud builds submit \
-        --tag us-central1-docker.pkg.dev/${{secrets.GCP_PROJECT_ID}}/iris-repo/iris-api
+      # 🔧 Enable required APIs (safe if already enabled)
+      - name: Enable required GCP services
+        run: |
+          gcloud services enable run.googleapis.com artifactregistry.googleapis.com
 
-        gcloud run deploy iris-api \
-        --image us-central1-docker.pkg.dev/${{secrets.GCP_PROJECT_ID}}/iris-repo/iris-api \
-        --region ${{secrets.GCP_REGION}} \
-        --platform managed \
-        --allow-unauthenticated
+      # 🚀 Deploy to Cloud Run
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy iris-api \
+            --source . \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --quiet
