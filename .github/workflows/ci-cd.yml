@@ -45,16 +45,28 @@ jobs:
       run: |
         pip install -r requirements.txt
 
-    - uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-    - uses: google-github-actions/setup-gcloud@v2
-
-    - name: Deploy to Cloud Run
+        
+    - name: Train the model
       run: |
+        python train.py
+        
+    - name: Authentication to Google
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{secrets.GCP_SA_KEY}}
+        
+    - name: setup-gcloud
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{secrets.GCP_PROJECT_ID}}
+        
+    - name: build and deploy
+      run: |
+        gcloud builds submit \
+        --tag us-central1-docker.pkg.dev/${{secrets.GCP_PROJECT_ID}}/iris-repo/iris-api
+
         gcloud run deploy iris-api \
-          --source . \
-          --region ${{ secrets.GCP_REGION }} \
-          --platform managed \
-          --allow-unauthenticated
+        --image us-central1-docker.pkg.dev/${{secrets.GCP_PROJECT_ID}}/iris-repo/iris-api \
+        --region ${{secrets.GCP_REGION}} \
+        --platform managed \
+        --allow-unauthenticated
